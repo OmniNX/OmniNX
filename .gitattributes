@@ -1,0 +1,30 @@
+# Git LFS for large, rarely-changing binary files
+# Only use LFS for files that are large AND don't change frequently
+# This helps manage LFS quota while keeping repo size reasonable
+
+# Large system binaries (rarely change)
+*.kip filter=lfs diff=lfs merge=lfs -text
+*.kipm filter=lfs diff=lfs merge=lfs -text
+*.bso filter=lfs diff=lfs merge=lfs -text
+*.romfs filter=lfs diff=lfs merge=lfs -text
+*.pak filter=lfs diff=lfs merge=lfs -text
+
+# Large payload binaries (update occasionally)
+# Note: If these update frequently, consider excluding from repo
+staging/bootloader/payloads/*.bin filter=lfs diff=lfs merge=lfs -text
+staging/bootloader/update.bin filter=lfs diff=lfs merge=lfs -text
+staging/bootloader/sys/*.bin filter=lfs diff=lfs merge=lfs -text
+staging/loader.bin filter=lfs diff=lfs merge=lfs -text
+staging/payload.bin filter=lfs diff=lfs merge=lfs -text
+
+# Large image files
+*.bmp filter=lfs diff=lfs merge=lfs -text
+
+# Homebrew files (.nro, .nsp) - These update more frequently
+# Consider: Exclude from LFS if they change often, or use LFS only for large ones
+# Uncomment if you want them in LFS:
+# *.nro filter=lfs diff=lfs merge=lfs -text
+# *.nsp filter=lfs diff=lfs merge=lfs -text
+
+# Archive files - typically excluded from repo anyway
+# *.zip filter=lfs diff=lfs merge=lfs -text
