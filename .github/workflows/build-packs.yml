@@ -1,0 +1,83 @@
+name: Build OmniNX Packs
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set version from tag
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "Version from tag: $VERSION"
+        
+    - name: Set version from input
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+        echo "Version from input: ${{ github.event.inputs.version }}"
+        
+    - name: Make build scripts executable
+      run: |
+        chmod +x scripts/build-pack.sh
+        chmod +x scripts/build-all.sh
+        
+    - name: Build all variants
+      run: |
+        ./scripts/build-all.sh $VERSION
+        
+    - name: Create release artifacts
+      run: |
+        mkdir -p release
+        cp output/*.zip release/ || true
+        
+    - name: Generate checksums
+      run: |
+        cd release
+        sha256sum *.zip > checksums.txt || true
+        cat checksums.txt
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: omninx-packs
+        path: release/
+        retention-days: 30
+        
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+        body: |
+          OmniNX CFW Pack Release ${{ env.VERSION }}
+          
+          ## Variants
+          - **Standard**: Full-featured pack
+          - **Light**: Minimal pack
+          - **OC**: Full pack with overclocking support
+          
+          ## Installation
+          1. Download the ZIP file for your desired variant
+          2. Extract to the root of your SD card
+          3. Boot with the appropriate payload
+          
+          ## Checksums
+          See checksums.txt for SHA256 checksums of all files.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
