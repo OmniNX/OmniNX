@@ -10,6 +10,15 @@ on:
         description: 'Version number (e.g., 1.0.0)'
         required: true
         default: '1.0.0'
+      hotfix:
+        description: 'Hotfix mode - update existing release instead of creating new one'
+        required: false
+        type: boolean
+        default: false
+      hotfix_tag:
+        description: 'Tag of existing release to update (required if hotfix is true)'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -34,7 +43,12 @@ jobs:
       if: github.event_name == 'workflow_dispatch'
       run: |
         echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+        echo "HOTFIX=${{ github.event.inputs.hotfix }}" >> $GITHUB_ENV
+        echo "HOTFIX_TAG=${{ github.event.inputs.hotfix_tag }}" >> $GITHUB_ENV
         echo "Version from input: ${{ github.event.inputs.version }}"
+        if [ "${{ github.event.inputs.hotfix }}" == "true" ]; then
+          echo "Hotfix mode: Will update release with tag ${{ github.event.inputs.hotfix_tag }}"
+        fi
         
     - name: Make build scripts executable
       run: |
@@ -53,17 +67,28 @@ jobs:
     - name: Set release tag name
       id: set_tag
       run: |
-        if [ -n "${{ github.ref_name }}" ]; then
+        if [ "${{ env.HOTFIX }}" == "true" ] && [ -n "${{ env.HOTFIX_TAG }}" ]; then
+          # Hotfix mode: use the specified tag
+          echo "tag=${{ env.HOTFIX_TAG }}" >> $GITHUB_OUTPUT
+          echo "mode=update" >> $GITHUB_OUTPUT
+        elif [ -n "${{ github.ref_name }}" ]; then
+          # Tag push: use the tag
           echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "mode=create" >> $GITHUB_OUTPUT
         else
+          # Manual run (non-hotfix): create new tag
           echo "tag=${{ env.VERSION }}" >> $GITHUB_OUTPUT
+          echo "mode=create" >> $GITHUB_OUTPUT
         fi
         
-    - name: Create GitHub Release
+    - name: Create or Update GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.set_tag.outputs.tag }}
         name: OmniNX Release ${{ env.VERSION }}
+        draft: false
+        prerelease: false
+        generate_release_notes: false
         files: |
           release/OmniNX-Standard-${{ env.VERSION }}.zip
           release/OmniNX-Light-${{ env.VERSION }}.zip
@@ -72,5 +97,7 @@ jobs:
           ## Changelog
           
           See the [changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+          
+          ${{ steps.set_tag.outputs.mode == 'update' && '**Hotfix Update** - This release has been updated with new builds.' || '' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
